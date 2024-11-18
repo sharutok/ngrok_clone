@@ -1,0 +1,29 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+ngrok_clone   # Exclude the compiled binary if named `myapp` (or replace with your app name)
+
+# Logs
+*.log
+
+# IDE and Editor specific files
+.idea/                    # JetBrains IDEs like GoLand
+.vscode/                  # Visual Studio Code
+*.swp                     # Swap files (for vim)
+*.swo
+*.swn
+.DS_Store                 # macOS Finder
+Thumbs.db                 # Windows thumbnail cache
+
+# Go specific
+vendor/                   # Go modules vendor directory (if using `go mod vendor`)
+*.test                    # Test binaries
+
+# Dependency directories (if using vendoring)
+vendor/
+
+# Go workspace and build files
+bin/
+pkg/
