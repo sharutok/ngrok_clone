@@ -51,8 +51,9 @@ func main() {
 	router.NoRoute(reverseProxyHandler)
 	router.POST("/add-app", ADD_APP)
 	router.POST("/delete-app", DELETE_APP)
+	router.GET("/health-check", HEALTH_CHECK)
 
-	port := "0.0.0.0:8001"
+	port := ":8081"
 	log.Printf("Reverse proxy server is running on port %s", port)
 	if err := router.Run(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
