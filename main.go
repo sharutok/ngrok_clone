@@ -44,17 +44,42 @@ func ReverseProxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// // Create a reverse proxy handler
+	// reverseProxyHandler := http.HandlerFunc(ReverseProxyHandler)
+
+	// // Wrap the handler with the logging middleware
+	// loggedHandler := (reverseProxyHandler)
+
+	// // Start the server
+	// port := "8888"
+	// log.Printf("Reverse proxy server running on port %s\n", port)
+
+	// if err := http.ListenAndServe(":"+port, loggedHandler); err != nil {
+	// 	log.Fatalf("Failed to start server: %v\n", err)
+	// }
+
 	// Create a reverse proxy handler
 	reverseProxyHandler := http.HandlerFunc(ReverseProxyHandler)
 
-	// Wrap the handler with the logging middleware
-	loggedHandler := (reverseProxyHandler)
+	// Create a new ServeMux to route requests
+	mux := http.NewServeMux()
+
+	// Add the reverse proxy handler
+	mux.Handle("/", reverseProxyHandler)
+	mux.HandleFunc("/health", HealthCheckHandler)
+
+	// Add the health check endpoint
 
 	// Start the server
-	port := "8888"
+	port := "8081"
 	log.Printf("Reverse proxy server running on port %s\n", port)
 
-	if err := http.ListenAndServe(":"+port, loggedHandler); err != nil {
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatalf("Failed to start server: %v\n", err)
 	}
+}
+
+func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }
