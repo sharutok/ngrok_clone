@@ -2,33 +2,41 @@ package main
 
 import (
 	"log"
-
-	"github.com/gin-gonic/gin"
+	"net/http"
+	"time"
 )
 
 type Applicationlist []string
 
-func CheckIfAppNameExist(c *gin.Context) {
-	rdb := ConnectToRedis()
+func LogRequestMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 
-	res, err := rdb.HGetAll(ctx, "proxy_server_app").Result()
-	if err != nil {
-		log.Fatalf("Could not retrieve hash: %v", err)
-		return
-	}
+		// Log request details
+		log.Printf("Incoming request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	// if strings.HasPrefix(c.GetHeader("Authorization"), "Bearer") && os.Getenv("AUTH_TOKEN") == strings.Split(c.GetHeader("Authorization"), " ")[1] {
-	app := c.Param("app")
-	if _, exists := res[app]; exists {
-		// value := strings.Split(res[app], ":")
-		c.Next()
-	} else {
-		log.Println("No match")
-		c.JSON(404, gin.H{"error": "App not found"})
-		c.Abort()
-	}
-	// } else {
-	// 	c.JSON(404, gin.H{"error": "no proper token"})
-	// 	c.Abort()
-	// }
+		// Use a ResponseWriter wrapper to capture the status code
+		lrw := &LoggingResponseWriter{ResponseWriter: w, StatusCode: http.StatusOK}
+
+		// Call the next handler
+		next.ServeHTTP(lrw, r)
+
+		// Log response details after the request is processed
+		log.Printf(
+			"Completed: %s %s with status %d in %v",
+			r.Method, r.URL.Path, lrw.StatusCode, time.Since(start),
+		)
+	})
+}
+
+// LoggingResponseWriter is a wrapper for http.ResponseWriter to capture the status code
+type LoggingResponseWriter struct {
+	http.ResponseWriter
+	StatusCode int
+}
+
+// WriteHeader captures the status code
+func (lrw *LoggingResponseWriter) WriteHeader(code int) {
+	lrw.StatusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
 }

@@ -1,61 +1,60 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
-
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	_ "github.com/joho/godotenv/autoload"
 )
 
-// createProxy creates a reverse proxy to the given target URL
-func createProxy(target string) *httputil.ReverseProxy {
-	url, err := url.Parse(target)
-	if err != nil {
-		log.Fatalf("Failed to parse target URL %s: %v", target, err)
-	}
-	return httputil.NewSingleHostReverseProxy(url)
-}
+func ReverseProxyHandler(w http.ResponseWriter, r *http.Request) {
 
-func reverseProxyHandler(c *gin.Context) {
-	path := c.Request.URL.Path
 	rdb := ConnectToRedis()
-
 	res, err := rdb.HGetAll(ctx, "reverse_proxy_server").Result()
 	if err != nil {
 		log.Fatalf("Could not retrieve hash: %v", err)
+		return
 	}
 
-	app := strings.Split(path, "/")[1]
+	for prefix, target := range res {
+		if strings.HasPrefix(r.URL.Path, prefix) {
+			// Parse the target URL
+			targetURL, err := url.Parse(target)
+			if err != nil {
+				http.Error(w, "Invalid target URL", http.StatusInternalServerError)
+				log.Printf("Error parsing target URL: %v\n", err)
+				return
+			}
 
-	for app_name, link := range res {
-		s := fmt.Sprintf("/%s", app_name)
-		if app == app_name {
-			c.Request.URL.Path = strings.TrimPrefix(path, s)
-			createProxy(link).ServeHTTP(c.Writer, c.Request)
+			// Create a reverse proxy for the matched backend
+			proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+			// Rewrite the path for the backend (optional)
+			r.URL.Path = strings.TrimPrefix(r.URL.Path, prefix)
+
+			// Forward the request
+			proxy.ServeHTTP(w, r)
 			return
 		}
 	}
-	log.Println("No match")
-	c.JSON(404, gin.H{"error": "App not found"})
-	c.Abort()
+
+	// If no route matches, return a 404
+	http.Error(w, "Route not found", http.StatusNotFound)
 }
 
 func main() {
-	godotenv.Load(".env")
-	router := gin.Default()
-	router.NoRoute(reverseProxyHandler)
-	router.POST("/add-app", ADD_APP)
-	router.POST("/delete-app", DELETE_APP)
-	router.GET("/health-check", HEALTH_CHECK)
+	// Create a reverse proxy handler
+	reverseProxyHandler := http.HandlerFunc(ReverseProxyHandler)
 
-	port := ":8081"
-	log.Printf("Reverse proxy server is running on port %s", port)
-	if err := router.Run(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Wrap the handler with the logging middleware
+	loggedHandler := (reverseProxyHandler)
+
+	// Start the server
+	port := "8888"
+	log.Printf("Reverse proxy server running on port %s\n", port)
+
+	if err := http.ListenAndServe(":"+port, loggedHandler); err != nil {
+		log.Fatalf("Failed to start server: %v\n", err)
 	}
 }
